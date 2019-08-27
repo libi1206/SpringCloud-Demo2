@@ -166,6 +166,34 @@
 
    启动多个Eureka实例，Eureka实例之间相互注册 **（待实践）**
 
+4. **其他常用配置**
+
+   * 服务续约的相关配置
+
+     ```yaml
+     eureka:
+       instance:
+         hostname: localhost
+         # 心跳包的发送间隔 默认30s
+         lease-renewal-interval-in-seconds: 30
+         # 未收到心跳包就剔除服务的时间上限，默认90s
+         lease-expiration-duration-in-seconds: 90
+     ```
+
+   * Eureka自我保护
+
+     如果EurekaServer在15分钟内心跳包的成功率小于85%，就会触发保护机制，任然让没有心跳的服务留在注册中心一段时间，排除是网络原因造成的心跳包丢失。这样的话服务可能会拿到已经不可用的服务。因此如果开启（默认开启）自我保护机制那么客户端就需要有重试机制或断路器之类的。
+
+     如果需要关掉自我保护机制，就添加下面的配置
+
+     ```yaml
+     eureka:
+       server:
+         enable-self-preservation: false
+     ```
+
+     
+
 
 
 ### 3 服务消费和负载均衡组件Ribbon
@@ -258,3 +286,86 @@
 
 
 做完以上步骤，启动ribbon服务，访问相关接口时，ribbon内部就会默认使用轮询的方式进行负载均衡。
+
+
+
+### 4. 服务保护组件 Hystrix
+
+先试验：在使用kill指令杀掉某一个hello-service服务的时候，在短时间内再去访问ribbon客户端，这样每两次请求都会返回一次Error Page，表示虽然服务在Eureka上但是已经不可用了。这种情况就需要服务保护组件做熔断、回调或者降级
+
+1. **在Ribbon客户端上添加Hystrix组件的依赖**
+
+   ```xml
+   <!--服务保护组件-->
+   <dependency>
+       <groupId>org.springframework.cloud</groupId>
+       <artifactId>spring-cloud-starter-netflix-hystrix</artifactId>
+   </dependency>
+   ```
+
+2. **添加@EnableHystrix注解开启断路功能**
+
+   ```java
+   @EnableHystrix
+   @EnableEurekaClient
+   @SpringBootApplication
+   public class RibbonApplication {
+       public static void main(String[] args) {
+           SpringApplication.run(RibbonApplication.class, args);
+       }
+   
+       @LoadBalanced
+       @Bean
+       /**
+        * 这里使用一个Rest模板帮我们调用服务的Rest接口，打上开启负载均衡的注解来开启负载均衡
+        */
+       public RestTemplate restTemplate() {
+           return new RestTemplate();
+       }
+   }
+   
+   ```
+
+3. **改造业务代码，添加断路的功能**
+
+   这里要改造业务的组织方式，添加Service层，如下
+
+   ```java
+   @Service
+   public class HelloServiceImpl implements HelloService {
+       @Autowired
+       private RestTemplate restTemplate;
+   
+       private static String SERVICE_NAME = "HELLO-PROVIDER";
+   
+       @Override
+     	//这个注解指定调用失败后执行的方法
+       @HystrixCommand(fallbackMethod = "helloFailBack")
+       public String hello() {
+           //填写地址的时候需要使用服务在eureka上填写的服务名称进行调用
+           return restTemplate.getForEntity("http://" + SERVICE_NAME + "/hello", String.class).getBody();
+       }
+   
+       @Override
+       public String helloFailBack() {
+           return "服务运行错误";
+       }
+   }
+   ```
+
+   Controller层如下
+
+   ```java
+   @RestController
+   public class RibbonController {
+       @Autowired
+       private HelloService helloService;
+   
+       @GetMapping("/ribbon-hello")
+       public String hello() {
+           return helloService.hello();
+       }
+   }
+   ```
+
+   默认情况下Hystrix的熔断时间是2000ms，超过这个时间没有响应，那么就会触发熔断机制，调用指定的回调函数
