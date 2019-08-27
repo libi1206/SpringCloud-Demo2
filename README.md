@@ -161,3 +161,100 @@
      ```
 
    * 启动这个项目，就可以在Eureka上看见这个项目的实例
+
+3. **注册中心高可用**
+
+   启动多个Eureka实例，Eureka实例之间相互注册 **（待实践）**
+
+
+
+### 3 服务消费和负载均衡组件Ribbon
+
+* 准备工作：把我们之前的服务提供者从不同的端口启动两份，现在，在eureka上就可以看见这个服务有两个这样的服务启动着
+
+  ```shell
+  java -jar hello-provider/target/hello-provider-0.0.1-SNAPSHOT.jar --server.port=9000
+  java -jar hello-provider/target/hello-provider-0.0.1-SNAPSHOT.jar --server.port=9001
+  ```
+
+1. **导入依赖**
+
+   ```xml
+       <dependencies>
+           <dependency>
+               <groupId>org.springframework.boot</groupId>
+               <artifactId>spring-boot-starter-web</artifactId>
+           </dependency>
+   
+           <dependency>
+               <groupId>org.springframework.cloud</groupId>
+               <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+           </dependency>
+   
+           <!-- 载均衡器Ribbon的依赖-->
+           <dependency>
+               <groupId>org.springframework.cloud</groupId>
+               <artifactId>spring-cloud-starter-netflix-ribbon</artifactId>
+           </dependency>
+       </dependencies>
+   ```
+
+2. **编写配置文件**
+
+   ```yaml
+   server:
+     port: 10000
+   
+   spring:
+     application:
+       name: ribbon-consumer
+   
+   eureka:
+     client:
+       service-url: http://localhost:8000/eureka
+   ```
+
+3. **在启动类上加上允许发现服务的注解**
+
+   ```java
+   @EnableEurekaClient
+   @SpringBootApplication
+   public class RibbonApplication {
+       public static void main(String[] args) {
+           SpringApplication.run(RibbonApplication.class, args);
+       }
+       
+       @LoadBalanced
+       @Bean
+       /**
+        * 这里使用一个Rest模板帮我们调用服务的Rest接口，打上开启负载均衡的注解来开启负载均衡
+        */
+       public RestTemplate restTemplate() {
+           return new RestTemplate();
+       }
+   }
+   ```
+
+   这里需要一个发现服务的注解并且需要一个RestTemplate的Bean来通过Http调用不同的服务。在创建这个Bean的时候就需要加上开启负载均衡的注解，这样Ribbon就会帮我做负载均衡
+
+4. **编写业务代码并且使用Ribbon**
+
+   ```java
+   @RestController
+   public class RibbonController {
+       @Autowired
+       private RestTemplate restTemplate;
+   
+       private static String SERVICE_NAME = "HELLO-PROVIDER";
+   
+       @GetMapping("/ribbon-hello")
+       public String hello() {
+           //填写地址的时候需要使用服务在eureka上填写的服务名称进行调用
+           return restTemplate.getForEntity("http://" + SERVICE_NAME + "/hello", String.class).getBody();
+       }
+   }
+   ```
+
+
+
+做完以上步骤，启动ribbon服务，访问相关接口时，ribbon内部就会默认使用轮询的方式进行负载均衡。
