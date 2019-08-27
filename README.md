@@ -55,7 +55,16 @@
 
    * 导入依赖
 
-     见上节
+     见上节，核心依赖如下
+
+     ```xml
+         <dependencies>
+             <dependency>
+                 <groupId>org.springframework.cloud</groupId>
+                 <artifactId>spring-cloud-starter-netflix-eureka-server</artifactId>
+             </dependency>
+         </dependencies>
+     ```
 
    * 添加配置文件
 
@@ -73,8 +82,82 @@
          eureka-server-u-r-l-context: http://${eureka.instance.hostname}:${server.port}/eureka/
      ```
 
-     
-
    * 在启动类上加上Eureka Server的注解
 
-2. 
+     ```java
+     @EnableEurekaServer
+     @SpringBootApplication
+     public class EurekaServerApplication {
+         public static void main(String[] args) {
+             SpringApplication.run(EurekaServerApplication.class, args);
+         }
+     }
+     ```
+
+   * 直接运行这个项目，访问eureka的地址就可以看见Eureka的相关界面
+
+2. **向Eureka注册服务**
+
+   * 导入依赖
+
+     核心依赖如下
+
+     ```xml
+     <dependency>
+         <groupId>org.springframework.boot</groupId>
+         <artifactId>spring-boot-starter-web</artifactId>
+     </dependency>
+     
+     <dependency>
+         <groupId>org.springframework.cloud</groupId>
+         <artifactId>spring-cloud-starter-netflix-eureka-server</artifactId>
+     </dependency>
+     ```
+
+   * 添加配置文件
+
+     ```yaml
+     server:
+       port: 9000
+     
+     spring:
+       # 服务名称，这个名称会显示在Eureka上
+       application:
+         name: hello-provider
+     
+     eureka:
+       client:
+         # 填写EurekaServer所在的地址和Uri，除了defaultZone以外还可以填写多个，defaultZone是自定义的名称
+         service-url:
+           defaultZone: http://localhost:8000/eureka
+     
+     ```
+
+   * 编写业务代码（Restful接口）
+
+     ```java
+     @Slf4j
+     @RestController
+     public class HelloController {
+     
+         @GetMapping("/hello")
+         public String hello() {
+             log.info("hello controller 初始化完成");
+             return "hello world";
+         }
+     }
+     ```
+
+   * 启动类上添加注解
+
+     ```java
+     @SpringBootApplication
+     @EnableEurekaClient
+     public class HelloApplication {
+         public static void main(String[] args) {
+             SpringApplication.run(HelloApplication.class, args);
+         }
+     }
+     ```
+
+   * 启动这个项目，就可以在Eureka上看见这个项目的实例

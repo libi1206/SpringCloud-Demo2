@@ -1,0 +1,13 @@
+server:
+  port: 9000
+
+spring:
+  # 服务名称，这个名称会显示在Eureka上
+  application:
+    name: hello-provider
+
+eureka:
+  client:
+    # 填写EurekaServer所在的地址和Uri，除了defaultZone以外还可以填写多个，defaultZone是自定义的名称
+    service-url:
+      defaultZone: http://localhost:8000/eureka
