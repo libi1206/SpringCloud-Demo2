@@ -12,7 +12,7 @@
     <artifactId>spring-demo2</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>spring-demo2</name>
-    <description>Demo project for Spring Boot</description>
+    <description>这个POM文件只是一个展示项目依赖的文件，和里面的模块没有任何关系</description>
 
     <properties>
         <java.version>1.8</java.version>
